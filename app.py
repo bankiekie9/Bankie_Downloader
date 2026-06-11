@@ -5,87 +5,103 @@ import re
 
 app = Flask(__name__)
 
-# Premium Video Downloader UI (With Advanced JS Force-Download)
+# Professional Professional UI like FDOWN.net
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>All-In-One Video Downloader</title>
+    <title>Social Media Video Downloader</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style> body { font-family: 'Inter', sans-serif; } </style>
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col items-center justify-center p-4">
 
-    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-xl border border-gray-100">
-        <div class="text-center mb-4">
-            <span class="bg-[#5A4FCF] text-white text-xs font-semibold px-4 py-1 rounded-full shadow-sm">
-                Premium Tool
-            </span>
-        </div>
+    <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-2xl border border-gray-100 text-center">
         
-        <h1 class="text-2xl font-bold text-center text-gray-800 mb-2">Social Media Downloader</h1>
-        <p class="text-sm text-gray-500 text-center mb-6">Supports: YouTube, TikTok, Facebook, Instagram (Original Quality)</p>
+        <div class="mb-6">
+            <div class="inline-block bg-[#5A4FCF] text-white text-3xl font-black px-5 py-2 rounded-xl shadow-md mb-2">
+                F
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800">Social Video Downloader</h1>
+            <p class="text-sm text-gray-500">Download Your Favorite Videos Easily</p>
+        </div>
 
-        <div class="space-y-4">
-            <input type="url" id="videoUrl" placeholder="Paste video link here..." 
+        <div class="flex flex-col sm:flex-row gap-2 max-w-xl mx-auto mb-6">
+            <input type="url" id="videoUrl" placeholder="Enter video link here..." 
                    class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5A4FCF] text-base">
-            
-            <button onclick="getDownloadLink()" 
-                    class="w-full bg-[#5A4FCF] hover:bg-[#483ebd] text-white font-semibold py-3 rounded-xl transition duration-200 shadow-md">
-                Get Download Link
+            <button onclick="getDownloadData()" 
+                    class="bg-[#5A4FCF] hover:bg-[#483ebd] text-white font-semibold py-3 px-6 rounded-xl transition duration-200 whitespace-nowrap">
+                Download
             </button>
         </div>
 
-        <div id="loading" class="mt-6 text-center hidden text-gray-600 font-medium animate-pulse">
-            Fetching original quality video, please wait...
+        <div id="loading" class="hidden my-8 text-gray-600 font-medium animate-pulse">
+            Analyzing video link, please wait...
         </div>
 
-        <div id="saving" class="mt-6 text-center hidden text-blue-600 font-medium animate-bounce">
-            Downloading video to your PC, please wait for the folder prompt...
-        </div>
-
-        <div id="result" class="mt-6 hidden bg-green-50 p-5 rounded-xl text-center border border-green-200">
-            <p id="videoTitle" class="text-gray-700 font-medium text-sm mb-3 truncate px-2"></p>
-            <p class="text-green-700 font-semibold mb-3">Video Found Successfully! 🎉</p>
+        <div id="result" class="hidden mt-6 border-t pt-6 text-left">
             
-            <button onclick="triggerForceDownload()"
-               class="inline-block bg-green-500 hover:bg-green-600 text-white font-bold py-2.5 px-6 rounded-lg transition duration-200 shadow w-full">
-                Download Now
-            </button>
+            <div class="flex flex-col md:flex-row bg-gray-50 border border-gray-200 rounded-xl p-4 gap-4 mb-6">
+                <div class="w-full md:w-48 h-32 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0 shadow-sm">
+                    <img id="videoThumb" src="" alt="Thumbnail" class="w-full h-full object-cover">
+                </div>
+                <div class="flex flex-col justify-center overflow-hidden">
+                    <h2 id="videoTitle" class="text-lg font-bold text-gray-800 truncate">No video title</h2>
+                    <p id="videoDuration" class="text-sm text-gray-500 mt-1">Duration: --:--</p>
+                    <p class="text-xs text-green-600 font-semibold mt-2">✓ Link generated successfully!</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button onclick="triggerDownload('normal')" 
+                   class="bg-slate-700 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-xl text-center transition shadow">
+                    Download Video in Normal Quality
+                </button>
+                <button onclick="triggerDownload('hd')" 
+                   class="bg-[#5A4FCF] hover:bg-[#483ebd] text-white font-bold py-3 px-4 rounded-xl text-center transition shadow">
+                    Download Video in HD Quality
+                </button>
+            </div>
+        </div>
+
+        <div id="savingAlert" class="hidden mt-4 text-sm text-blue-600 font-medium animate-bounce">
+            Preparing file... Your browser will prompt the "Save As" window shortly.
         </div>
     </div>
 
     <script>
-        let globalDownloadUrl = "";
-        let globalFileName = "";
+        let videoData = null;
 
-        async function getDownloadLink() {
+        async function getDownloadData() {
             const url = document.getElementById('videoUrl').value;
             const loading = document.getElementById('loading');
             const result = document.getElementById('result');
-            const videoTitleText = document.getElementById('videoTitle');
-            const saving = document.getElementById('saving');
+            const savingAlert = document.getElementById('savingAlert');
 
             if (!url) {
-                alert('Please paste a video URL first!');
+                alert('Please enter a video link first!');
                 return;
             }
 
             loading.classList.remove('hidden');
             result.classList.add('hidden');
-            saving.classList.add('hidden');
+            savingAlert.classList.add('hidden');
 
             try {
                 const response = await fetch(`/api/download?url=${encodeURIComponent(url)}`);
                 const data = await response.json();
 
                 if (data.success) {
-                    globalDownloadUrl = data.download_url;
-                    globalFileName = `${data.title}.mp4`;
-                    videoTitleText.innerText = "Title: " + data.title_display;
+                    videoData = data;
+                    
+                    // Display Data
+                    document.getElementById('videoThumb').src = data.thumbnail || 'https://placehold.co/192x128?text=Video';
+                    document.getElementById('videoTitle').innerText = data.title_display;
+                    document.getElementById('videoDuration').innerText = "Duration: " + data.duration;
+                    
                     result.classList.remove('hidden');
                 } else {
                     alert('Error: ' + data.error);
@@ -97,39 +113,40 @@ HTML_TEMPLATE = """
             }
         }
 
-        // មុខងារពិសេស៖ លួចទាញយកទិន្នន័យស្ងាត់ៗ រួចបង្ខំឱ្យ Browser បើកផ្ទាំង Save As ជាប់ចំណងជើង
-        async function triggerForceDownload() {
-            const saving = document.getElementById('saving');
-            const result = document.getElementById('result');
-            
-            if (!globalDownloadUrl) return;
+        // Advanced JS Blob download method to force folder prompt and keep custom title
+        async function triggerDownload(quality) {
+            if (!videoData) return;
 
-            saving.classList.remove('hidden');
-            result.classList.add('hidden');
+            const savingAlert = document.getElementById('savingAlert');
+            savingAlert.classList.remove('hidden');
+
+            // Select quality link
+            let targetUrl = videoData.normal_url;
+            if (quality === 'hd' && videoData.hd_url) {
+                targetUrl = videoData.hd_url;
+            }
+
+            const fileName = `${videoData.title}_${quality}.mp4`;
 
             try {
-                const response = await fetch(globalDownloadUrl);
+                const response = await fetch(targetUrl);
                 const blob = await response.blob();
                 const blobUrl = window.URL.createObjectURL(blob);
                 
-                // បង្កើតតំណភ្ជាប់បណ្តោះអាសន្នដើម្បីចុចទាញយកដោយស្វ័យប្រវត្តិ
                 const tempLink = document.createElement('a');
                 tempLink.href = blobUrl;
-                tempLink.setAttribute('download', globalFileName);
+                tempLink.setAttribute('download', fileName);
                 document.body.appendChild(tempLink);
                 tempLink.click();
                 
-                // សម្អាតបន្ទាប់ពីលោតផ្ទាំងរក្សាទុករួច
                 document.body.removeChild(tempLink);
                 window.URL.revokeObjectURL(blobUrl);
             } catch (error) {
-                // បើជាប់បញ្ហា Cross-Origin (CORS) របស់ Browser វាអាចនឹងធ្លាក់មកទីនេះ
-                // យើងផ្តល់ជម្រើសចុងក្រោយជូនអ្នកប្រើប្រាស់
-                alert("Browser blocked direct save. Opening video. Please right-click and select 'Save video as...'");
-                window.open(globalDownloadUrl, '_blank');
+                // CORS Fallback helper
+                alert("Direct save blocked by browser policy. Opening video link... Please right-click and choose 'Save video as...'");
+                window.open(targetUrl, '_blank');
             } finally {
-                saving.classList.add('hidden');
-                result.classList.remove('hidden');
+                savingAlert.classList.add('hidden');
             }
         }
     </script>
@@ -148,7 +165,6 @@ def download():
         return jsonify({'success': False, 'error': 'No URL provided'})
 
     ydl_opts = {
-        'format': 'best',
         'quiet': True,
         'no_warnings': True,
     }
@@ -156,20 +172,39 @@ def download():
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
-            direct_url = info.get('url')
-            original_title = info.get('title', 'video')
             
+            # Formats separation handling
+            formats = info.get('formats', [])
+            normal_url = info.get('url') # Default fallback link
+            hd_url = info.get('url')     # Default fallback link
+            
+            # Find better formats if available
+            mp4_formats = [f for f in formats if f.get('vcodec') != 'none' and f.get('acodec') != 'none' and f.get('ext') == 'mp4']
+            
+            if mp4_formats:
+                # Sort by resolution height
+                mp4_formats = sorted(mp4_formats, key=lambda x: x.get('height', 0))
+                normal_url = mp4_formats[0].get('url') # Lowest resolution format
+                hd_url = mp4_formats[-1].get('url')    # Highest resolution format
+
+            original_title = info.get('title', 'video')
             clean_title = re.sub(r'[^\w\s-]', '', original_title).strip().replace(' ', '_')
             
-            if direct_url:
-                return jsonify({
-                    'success': True, 
-                    'download_url': direct_url, 
-                    'title': clean_title,
-                    'title_display': original_title
-                })
-            else:
-                return jsonify({'success': False, 'error': 'Could not extract video URL'})
+            # Convert raw seconds into MM:SS format display
+            duration_secs = info.get('duration', 0)
+            mins = duration_secs // 60
+            secs = duration_secs % 60
+            duration_str = f"{mins:02d}:{secs:02d} minutes" if duration_secs else "Unknown"
+
+            return jsonify({
+                'success': True,
+                'normal_url': normal_url,
+                'hd_url': hd_url,
+                'title': clean_title,
+                'title_display': original_title,
+                'thumbnail': info.get('thumbnail'),
+                'duration': duration_str
+            })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
