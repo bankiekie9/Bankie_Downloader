@@ -5,7 +5,7 @@ import re
 
 app = Flask(__name__)
 
-# Premium Video Downloader UI (Pure English Version)
+# Premium Video Downloader UI (Pure English & Fixed Routes)
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -94,13 +94,18 @@ HTML_TEMPLATE = """
 </html>
 """
 
+# Fixed Route for Home Page Location
+@app.route('/')
+def home():
+    return render_template_string(HTML_TEMPLATE)
+
+# API Route for Downloading
 @app.route('/api/download')
 def download():
     video_url = request.args.get('url')
     if not video_url:
         return jsonify({'success': False, 'error': 'No URL provided'})
 
-    # 'format': 'best' instructs yt-dlp to grab the highest single-file original resolution available (with audio embedded)
     ydl_opts = {
         'format': 'best',
         'quiet': True,
@@ -113,7 +118,6 @@ def download():
             direct_url = info.get('url')
             original_title = info.get('title', 'video')
             
-            # Clean filename to avoid OS errors during download save
             clean_title = re.sub(r'[^\w\s-]', '', original_title).strip().replace(' ', '_')
             
             if direct_url:
