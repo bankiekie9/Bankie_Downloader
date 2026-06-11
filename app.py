@@ -1,12 +1,11 @@
-from flask import Flask, request, jsonify, render_template_string, Response
+from flask import Flask, request, jsonify, render_template_string
 import yt_dlp
 import os
-import requests
 import re
 
 app = Flask(__name__)
 
-# Premium Video Downloader UI
+# Premium Video Downloader UI (Pure English Version)
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -28,7 +27,7 @@ HTML_TEMPLATE = """
         </div>
         
         <h1 class="text-2xl font-bold text-center text-gray-800 mb-2">Social Media Downloader</h1>
-        <p class="text-sm text-gray-500 text-center mb-6">Supports: YouTube, TikTok, Facebook, Instagram (1080p HD)</p>
+        <p class="text-sm text-gray-500 text-center mb-6">Supports: YouTube, TikTok, Facebook, Instagram (Original Quality)</p>
 
         <div class="space-y-4">
             <input type="url" id="videoUrl" placeholder="Paste video link here..." 
@@ -41,16 +40,18 @@ HTML_TEMPLATE = """
         </div>
 
         <div id="loading" class="mt-6 text-center hidden text-gray-600 font-medium animate-pulse">
-            Fetching highest quality video, please wait...
+            Fetching original quality video, please wait...
         </div>
 
         <div id="result" class="mt-6 hidden bg-green-50 p-5 rounded-xl text-center border border-green-200">
-            <p id="videoTitle" class="text-gray-700 font-medium text-sm mb-2 truncate"></p>
+            <p id="videoTitle" class="text-gray-700 font-medium text-sm mb-3 truncate px-2"></p>
             <p class="text-green-700 font-semibold mb-3">Video Found Successfully! 🎉</p>
-            <a id="downloadBtn" href="#" 
-               class="inline-block bg-green-500 hover:bg-green-600 text-white font-bold py-2.5 px-6 rounded-lg transition duration-200 shadow">
+            
+            <a id="downloadBtn" href="#" download rel="noopener noreferrer" target="_blank"
+               class="inline-block bg-green-500 hover:bg-green-600 text-white font-bold py-2.5 px-6 rounded-lg transition duration-200 shadow w-full">
                 Download Now
             </a>
+            <p class="text-xs text-gray-400 mt-2">Note: If it plays in a new tab, right-click and choose "Save video as..."</p>
         </div>
     </div>
 
@@ -75,9 +76,9 @@ HTML_TEMPLATE = """
                 const data = await response.json();
 
                 if (data.success) {
-                    // ប្តូរទៅហៅផ្លូវ Proxy ដើម្បីបង្ខំឱ្យ Browser លោតផ្ទាំង Save As ជាប់ចំណងជើង
-                    downloadBtn.href = `/api/fetch?url=${encodeURIComponent(data.download_url)}&title=${encodeURIComponent(data.title)}`;
-                    videoTitleText.innerText = "Title: " + data.title;
+                    downloadBtn.href = data.download_url;
+                    downloadBtn.setAttribute('download', `${data.title}.mp4`);
+                    videoTitleText.innerText = "Title: " + data.title_display;
                     result.classList.remove('hidden');
                 } else {
                     alert('Error: ' + data.error);
@@ -93,19 +94,15 @@ HTML_TEMPLATE = """
 </html>
 """
 
-@app.route('/')
-def home():
-    return render_template_string(HTML_TEMPLATE)
-
 @app.route('/api/download')
 def download():
     video_url = request.args.get('url')
     if not video_url:
         return jsonify({'success': False, 'error': 'No URL provided'})
 
-    # កំណត់ទាញយកទម្រង់វីដេអូដែលច្បាស់បំផុត (HD/1080p) ដែលមានទាំងរូបភាពនិងសំឡេងស្រាប់
+    # 'format': 'best' instructs yt-dlp to grab the highest single-file original resolution available (with audio embedded)
     ydl_opts = {
-        'format': 'best[ext=mp4]/best', 
+        'format': 'best',
         'quiet': True,
         'no_warnings': True,
     }
@@ -114,43 +111,22 @@ def download():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
             direct_url = info.get('url')
-            title = info.get('title', 'video')
+            original_title = info.get('title', 'video')
             
-            # លុបសញ្ញាពិសេសចេញពី Title ការពារការខូចឈ្មោះឯកសារពេល Save
-            clean_title = re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '_')
+            # Clean filename to avoid OS errors during download save
+            clean_title = re.sub(r'[^\w\s-]', '', original_title).strip().replace(' ', '_')
             
             if direct_url:
-                return jsonify({'success': True, 'download_url': direct_url, 'title': clean_title})
+                return jsonify({
+                    'success': True, 
+                    'download_url': direct_url, 
+                    'title': clean_title,
+                    'title_display': original_title
+                })
             else:
-                return jsonify({'success': False, 'error': 'Could not extract high-quality URL'})
+                return jsonify({'success': False, 'error': 'Could not extract video URL'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
-
-# ផ្លូវពិសេស (Proxy Route) បង្ខំឱ្យ Browser លោតផ្ទាំងដោនឡូត "Save As" ចូល PC ភ្លាមៗ
-@app.route('/api/fetch')
-def fetch_video():
-    target_url = request.args.get('url')
-    filename = request.args.get('title', 'video')
-    
-    if not target_url:
-        return "Missing URL", 400
-
-    try:
-        req = requests.get(target_url, stream=True)
-        headers = {
-            'Content-Disposition': f'attachment; filename="{filename}.mp4"',
-            'Content-Type': req.headers.get('Content-Type', 'video/mp4')
-        }
-        
-        # បញ្ជូនទិន្នន័យជាកញ្ចប់ៗ (Streaming) ដើម្បីកុំឱ្យណែន RAM របស់ Server Free លើ Render
-        def generate():
-            for chunk in req.iter_content(chunk_size=4096):
-                if chunk:
-                    yield chunk
-                    
-        return Response(generate(), headers=headers)
-    except Exception as e:
-        return str(e), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
