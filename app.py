@@ -5,7 +5,7 @@ import re
 
 app = Flask(__name__)
 
-# Premium Video Downloader UI (Pure English & Fixed Routes)
+# Premium Video Downloader UI (With Advanced JS Force-Download)
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -43,25 +43,31 @@ HTML_TEMPLATE = """
             Fetching original quality video, please wait...
         </div>
 
+        <div id="saving" class="mt-6 text-center hidden text-blue-600 font-medium animate-bounce">
+            Downloading video to your PC, please wait for the folder prompt...
+        </div>
+
         <div id="result" class="mt-6 hidden bg-green-50 p-5 rounded-xl text-center border border-green-200">
             <p id="videoTitle" class="text-gray-700 font-medium text-sm mb-3 truncate px-2"></p>
             <p class="text-green-700 font-semibold mb-3">Video Found Successfully! 🎉</p>
             
-            <a id="downloadBtn" href="#" download rel="noopener noreferrer" target="_blank"
+            <button onclick="triggerForceDownload()"
                class="inline-block bg-green-500 hover:bg-green-600 text-white font-bold py-2.5 px-6 rounded-lg transition duration-200 shadow w-full">
                 Download Now
-            </a>
-            <p class="text-xs text-gray-400 mt-2">Note: If it plays in a new tab, right-click and choose "Save video as..."</p>
+            </button>
         </div>
     </div>
 
     <script>
+        let globalDownloadUrl = "";
+        let globalFileName = "";
+
         async function getDownloadLink() {
             const url = document.getElementById('videoUrl').value;
             const loading = document.getElementById('loading');
             const result = document.getElementById('result');
-            const downloadBtn = document.getElementById('downloadBtn');
             const videoTitleText = document.getElementById('videoTitle');
+            const saving = document.getElementById('saving');
 
             if (!url) {
                 alert('Please paste a video URL first!');
@@ -70,14 +76,15 @@ HTML_TEMPLATE = """
 
             loading.classList.remove('hidden');
             result.classList.add('hidden');
+            saving.classList.add('hidden');
 
             try {
                 const response = await fetch(`/api/download?url=${encodeURIComponent(url)}`);
                 const data = await response.json();
 
                 if (data.success) {
-                    downloadBtn.href = data.download_url;
-                    downloadBtn.setAttribute('download', `${data.title}.mp4`);
+                    globalDownloadUrl = data.download_url;
+                    globalFileName = `${data.title}.mp4`;
                     videoTitleText.innerText = "Title: " + data.title_display;
                     result.classList.remove('hidden');
                 } else {
@@ -89,17 +96,51 @@ HTML_TEMPLATE = """
                 loading.classList.add('hidden');
             }
         }
+
+        // មុខងារពិសេស៖ លួចទាញយកទិន្នន័យស្ងាត់ៗ រួចបង្ខំឱ្យ Browser បើកផ្ទាំង Save As ជាប់ចំណងជើង
+        async function triggerForceDownload() {
+            const saving = document.getElementById('saving');
+            const result = document.getElementById('result');
+            
+            if (!globalDownloadUrl) return;
+
+            saving.classList.remove('hidden');
+            result.classList.add('hidden');
+
+            try {
+                const response = await fetch(globalDownloadUrl);
+                const blob = await response.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                
+                // បង្កើតតំណភ្ជាប់បណ្តោះអាសន្នដើម្បីចុចទាញយកដោយស្វ័យប្រវត្តិ
+                const tempLink = document.createElement('a');
+                tempLink.href = blobUrl;
+                tempLink.setAttribute('download', globalFileName);
+                document.body.appendChild(tempLink);
+                tempLink.click();
+                
+                // សម្អាតបន្ទាប់ពីលោតផ្ទាំងរក្សាទុករួច
+                document.body.removeChild(tempLink);
+                window.URL.revokeObjectURL(blobUrl);
+            } catch (error) {
+                // បើជាប់បញ្ហា Cross-Origin (CORS) របស់ Browser វាអាចនឹងធ្លាក់មកទីនេះ
+                // យើងផ្តល់ជម្រើសចុងក្រោយជូនអ្នកប្រើប្រាស់
+                alert("Browser blocked direct save. Opening video. Please right-click and select 'Save video as...'");
+                window.open(globalDownloadUrl, '_blank');
+            } finally {
+                saving.classList.add('hidden');
+                result.classList.remove('hidden');
+            }
+        }
     </script>
 </body>
 </html>
 """
 
-# Fixed Route for Home Page Location
 @app.route('/')
 def home():
     return render_template_string(HTML_TEMPLATE)
 
-# API Route for Downloading
 @app.route('/api/download')
 def download():
     video_url = request.args.get('url')
